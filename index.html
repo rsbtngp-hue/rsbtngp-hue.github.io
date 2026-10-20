@@ -4,6 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Overall Performance Monitoring Dashboard | Nagpur Postal Region</title>
+  <style id="employeeAuthGateStyles">
+    /* Employee portal gate: keep the original homepage markup and styling intact. */
+    .shell{visibility:hidden}
+    #employeeAuthGate{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:24px;background:#f3f6f9;color:#102a43;font-family:Arial,Helvetica,sans-serif;text-align:center}
+    #employeeAuthGate .gate-card{width:min(520px,100%);background:#fff;border-radius:16px;padding:28px;box-shadow:0 8px 30px rgba(25,40,55,.18)}
+    #employeeAuthGate h2{margin:0 0 10px;color:#5c0d1a}
+    #employeeAuthGate p{line-height:1.55;color:#627d98}
+    #employeeAuthGate button{border:0;border-radius:8px;background:#5c0d1a;color:#fff;padding:12px 18px;font-weight:700;cursor:pointer}
+    #employeeAuthGate .gate-error{color:#b42318}
+    body.employee-authenticated .shell{visibility:visible}
+    body.employee-authenticated #employeeAuthGate{display:none}
+  </style>
+  
   <style>
     :root { --maroon:#5c0d1a; --maroon-deep:#33060e; --gold:#f9bd05; --ink:#102a43; --muted:#627d98; --paper:#f3f6f9; }
     * { box-sizing:border-box; }
@@ -238,5 +251,123 @@
     }
     document.addEventListener('DOMContentLoaded', applySavedCardOrder);
   </script>
+
+  <div id="employeeAuthGate" role="status" aria-live="polite">
+    <div class="gate-card">
+      <h2>Nagpur Postal Region</h2>
+      <p id="employeeAuthMessage">Checking your registered employee access…</p>
+      <button id="employeeAuthRetry" type="button" hidden>Return to Login</button>
+    </div>
+  </div>
+  <script id="employeeAuthGateScript">
+  (() => {
+    'use strict';
+    const PORTAL_URL = 'https://script.google.com/macros/s/AKfycbwGfQLoPhrb-RYfcvCNOFIlkluPEf64UvcIHMjNMDAfXTocNZSGtbf-Hw-tmv6EAmSi/exec';
+    const HOME_URL = 'https://ronagpur.com/';
+    const TOKEN_KEY = 'nagpurEmployeePortalToken';
+    const NAME_KEY = 'nagpurEmployeePortalName';
+    const ROLE_KEY = 'nagpurEmployeePortalRole';
+    const message = document.getElementById('employeeAuthMessage');
+    const retry = document.getElementById('employeeAuthRetry');
+    let requestNo = 0;
+
+    function showError(text) {
+      message.textContent = text;
+      message.classList.add('gate-error');
+      retry.hidden = false;
+    }
+    retry.addEventListener('click', () => {
+      sessionStorage.removeItem(TOKEN_KEY);
+      sessionStorage.removeItem(NAME_KEY);
+      sessionStorage.removeItem(ROLE_KEY);
+      location.replace(PORTAL_URL + '?returnTo=' + encodeURIComponent(HOME_URL));
+    });
+
+    function jsonp(params, callback) {
+      const cb = '__nprPortalCallback' + (++requestNo);
+      const script = document.createElement('script');
+      let finished = false;
+      const cleanup = () => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        delete window[cb];
+        script.remove();
+      };
+      window[cb] = data => { cleanup(); callback(data); };
+      params.callback = cb;
+      script.src = PORTAL_URL + '?' + new URLSearchParams(params).toString();
+      script.onerror = () => { cleanup(); showError('Unable to verify access with the employee portal. Please try again.'); };
+      const timer = setTimeout(() => { cleanup(); showError('The employee portal did not respond. Please try again.'); }, 15000);
+      document.head.appendChild(script);
+    }
+
+    function acceptSession(token, data) {
+      if (!data || !data.ok || !token) {
+        sessionStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(NAME_KEY);
+        sessionStorage.removeItem(ROLE_KEY);
+        showError('Your login has expired or could not be verified. Please sign in again.');
+        return;
+      }
+      sessionStorage.setItem(TOKEN_KEY, token);
+      sessionStorage.setItem(NAME_KEY, data.name || '');
+      sessionStorage.setItem(ROLE_KEY, data.role || 'employee');
+      document.body.classList.add('employee-authenticated');
+      const gate = document.getElementById('employeeAuthGate');
+      if (gate) gate.remove();
+      window.dispatchEvent(new CustomEvent('npr-employee-authenticated', {
+        detail: {name: data.name || '', role: data.role || 'employee'}
+      }));
+      startPeriodicValidation();
+    }
+
+    function startPeriodicValidation() {
+      window.setInterval(() => {
+        const token = sessionStorage.getItem(TOKEN_KEY);
+        if (!token || document.visibilityState === 'hidden') return;
+        jsonp({action:'homeAuth', op:'validate', token}, data => {
+          if (!data || !data.ok) {
+            sessionStorage.removeItem(TOKEN_KEY);
+            sessionStorage.removeItem(NAME_KEY);
+            sessionStorage.removeItem(ROLE_KEY);
+            location.replace(PORTAL_URL + '?returnTo=' + encodeURIComponent(HOME_URL));
+          }
+        });
+      }, 120000);
+    }
+
+    const params = new URLSearchParams(location.search);
+    const ticket = params.get('portal_ticket');
+    if (ticket) {
+      // Remove the one-time ticket from the visible URL before making further requests.
+      history.replaceState(null, '', location.pathname + location.hash);
+      jsonp({action:'homeAuth', op:'consume', ticket}, data => {
+        if (!data || !data.ok || !data.token) {
+          showError('This login link has expired or has already been used. Please sign in again.');
+          return;
+        }
+        acceptSession(data.token, data);
+      });
+      return;
+    }
+
+    const savedToken = sessionStorage.getItem(TOKEN_KEY);
+    if (savedToken) {
+      jsonp({action:'homeAuth', op:'validate', token:savedToken}, data => {
+        if (data && data.ok) acceptSession(savedToken, data);
+        else {
+          sessionStorage.removeItem(TOKEN_KEY);
+          sessionStorage.removeItem(NAME_KEY);
+          sessionStorage.removeItem(ROLE_KEY);
+          location.replace(PORTAL_URL + '?returnTo=' + encodeURIComponent(HOME_URL));
+        }
+      });
+    } else {
+      location.replace(PORTAL_URL + '?returnTo=' + encodeURIComponent(HOME_URL));
+    }
+  })();
+  </script>
+
 </body>
 </html>
