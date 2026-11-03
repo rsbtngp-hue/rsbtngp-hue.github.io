@@ -71,11 +71,18 @@
     .card-icon { width:58px; height:58px; object-fit:contain; background:#fff; border-radius:8px; padding:3px; filter:drop-shadow(0 1px 1px rgba(0,0,0,.28)); }
     .posb { background:linear-gradient(135deg,#07aa85,#00bd97); }.misc { background:linear-gradient(135deg,#2e5ee3,#4585f0); }.pli { background:linear-gradient(135deg,#7421d4,#9b4fe9); }.aadhaar { background:linear-gradient(135deg,#d37500,#fb9700); }.report { background:linear-gradient(135deg,#0c9ab5,#15b6ca); }.digital { background:linear-gradient(135deg,#c61770,#ec3992); }.mail { background:linear-gradient(135deg,#df202c,#ef3440); }.attendance { background:linear-gradient(135deg,#203653,#637792); }.other { background:linear-gradient(135deg,#129f55,#18ce67); }
     dialog { border:0; border-radius:18px; padding:0; max-width:390px; box-shadow:0 20px 70px rgba(0,0,0,.35); }
+    .kpi-submenu { width:min(760px,calc(100% - 24px)); max-width:760px; }
+    .kpi-submenu .dialog-body { padding:28px; text-align:left; }
+    .kpi-submenu h4 { margin:0 0 7px; font-size:24px; text-align:center; }
+    .kpi-submenu p { margin:0 0 20px; text-align:center; }
+    .sub-kpi-grid { display:grid; grid-template-columns:repeat(2,minmax(220px,1fr)); gap:17px; }
+    .sub-kpi-grid .card { width:100%; min-height:138px; }
+    .submenu-close { display:block; margin:20px auto 0 !important; }
     dialog::backdrop { background:rgba(20,30,45,.56); backdrop-filter:blur(2px); }
     .dialog-body { padding:30px; text-align:center; }.dialog-body .big { font-size:44px; }.dialog-body h4 { margin:10px 0 6px; font-size:24px; }.dialog-body p { color:#596b7d; }.dialog-body button { margin-top:18px; padding:10px 25px; background:var(--maroon); color:#fff; border:0; border-radius:7px; font-weight:700; cursor:pointer; }
     footer { padding:10px 30px; text-align:center; background:#102a43; color:#dbe7f2; font-size:12px; }
     @media (max-width:1000px) { .masthead { grid-template-columns:160px 1fr; }.status { grid-column:1 / -1; text-align:center; }.brand { height:100px; }.titles h1 {font-size:31px}.titles h2{font-size:19px}.titles p{font-size:17px}.grid{grid-template-columns:repeat(2,1fr)}.content{padding:28px} }
-    @media (max-width:620px) { .shell{width:100%;margin:0}.masthead{grid-template-columns:1fr;padding:16px}.brand{display:none}.titles h1{font-size:28px}.titles h2{font-size:18px}.titles p{font-size:16px}.grid{grid-template-columns:1fr}.content-head{align-items:start;flex-direction:column}.card{min-height:112px;font-size:21px}nav a{padding:13px 12px;font-size:14px} }
+    @media (max-width:620px) { .shell{width:100%;margin:0}.masthead{grid-template-columns:1fr;padding:16px}.brand{display:none}.titles h1{font-size:28px}.titles h2{font-size:18px}.titles p{font-size:16px}.grid,.sub-kpi-grid{grid-template-columns:1fr}.content-head{align-items:start;flex-direction:column}.card{min-height:112px;font-size:21px}nav a{padding:13px 12px;font-size:14px} }
   </style>
 
   <!-- NPR_PORTAL_AUTH_GATE_V1: restrict dashboard access to verified employee sessions -->
@@ -148,6 +155,17 @@
     <footer>@ 2026 Department of Posts • Nagpur Postal Region • Overall Performance Monitoring Dashboard</footer>
   </main>
   <dialog id="soon"><div class="dialog-body"><div class="big">🚧</div><h4 id="soonTitle">Attendance System — Coming Soon</h4><p>This monitoring section is being prepared and will be available shortly.</p><button onclick="document.getElementById('soon').close()">Close</button></div></dialog>
+  <dialog id="posbMiscMenu" class="kpi-submenu" aria-labelledby="posbMiscMenuTitle">
+    <div class="dialog-body">
+      <h4 id="posbMiscMenuTitle">POSB Misc. Monitoring</h4>
+      <p>Select a KPI monitoring dashboard.</p>
+      <div class="sub-kpi-grid">
+        <button class="card posb" type="button" onclick="openLink('https://ronagpur.com/POSB-Revenue/')"><span class="icon" aria-hidden="true">💰</span><span class="card-copy"><span class="card-title">POSB Revenue Target Monitoring</span></span></button>
+        <button class="card misc" type="button" onclick="openLink('https://ronagpur.com/aof-pending/')"><img class="card-icon" src="posb-aof-pending-monitoring.png" alt=""><span class="card-copy"><span class="card-title">AOF Pending Monitoring</span></span></button>
+      </div>
+      <button class="submenu-close" type="button" onclick="document.getElementById('posbMiscMenu').close()">Close</button>
+    </div>
+  </dialog>
   <dialog id="adminLogin" class="admin-panel"><div class="dialog-body"><div class="big">🔐</div><h4>Administrator Login</h4><p>Enter the administrator password to manage dashboard cards.</p><form onsubmit="return verifyAdmin(event)"><label for="adminPassword">Password</label><input id="adminPassword" type="password" autocomplete="current-password" required="" placeholder="Enter admin password"><p id="loginError" style="color: rgb(185, 28, 28); display: none;">Incorrect password. Please try again.</p><div class="admin-actions"><button type="submit">Login</button><button type="button" onclick="document.getElementById('adminLogin').close()">Cancel</button></div></form></div></dialog>
   <dialog id="adminOrder" class="admin-panel" aria-labelledby="kpiManagerTitle">
     <div class="dialog-body">
@@ -225,7 +243,10 @@
         const copy = document.createElement('span'); copy.className = 'card-copy';
         const title = document.createElement('span'); title.className = 'card-title'; title.textContent = data.title; copy.appendChild(title);
         if (data.sublink) { const sublink = document.createElement('span'); sublink.className = 'card-sublink'; sublink.textContent = data.sublink; copy.appendChild(sublink); }
-        card.appendChild(copy); card.onclick = () => data.url ? openLink(data.url) : comingSoon(data.title);
+        card.appendChild(copy);
+        card.onclick = () => data.id === 'card-4'
+          ? document.getElementById('posbMiscMenu').showModal()
+          : data.url ? openLink(data.url) : comingSoon(data.title);
         fragment.appendChild(card);
       });
       document.getElementById('mainGrid').replaceChildren(fragment);
